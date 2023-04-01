@@ -1,8 +1,12 @@
+// ignore_for_file: avoid_print
+
+import 'package:chat_gpt/chat_gpt_api/chat_gpt_ultis.dart';
 import 'package:flutter/material.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'package:intl/intl.dart';
 import '../model/message.dart';
 import 'package:bubble/bubble.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -13,44 +17,13 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final textFieldController = TextEditingController();
-  List<Message> messageList = [
-    Message(
-        message: "abcabcabcabc",
-        date: DateTime.now().subtract(const Duration(days: 1, minutes: 1)),
-        isUser: true),
-    Message(
-        message: "defabcabc",
-        date: DateTime.now().subtract(const Duration(days: 3, minutes: 2)),
-        isUser: false),
-    Message(
-        message: "ghdefabci",
-        date: DateTime.now().subtract(const Duration(days: 3, minutes: 3)),
-        isUser: true),
-    Message(
-        message: "jkdefabcl",
-        date: DateTime.now().subtract(const Duration(days: 4, minutes: 4)),
-        isUser: false),
-    Message(
-        message: "mndefabco",
-        date: DateTime.now().subtract(const Duration(days: 5, minutes: 5)),
-        isUser: true),
-    Message(
-        message: "pdefabcqr",
-        date: DateTime.now().subtract(const Duration(days: 6, minutes: 6)),
-        isUser: false),
-    Message(
-        message: "stdefabcu",
-        date: DateTime.now().subtract(const Duration(days: 6, minutes: 7)),
-        isUser: true),
-    Message(
-        message: "vdefabcwx",
-        date: DateTime.now().subtract(const Duration(days: 6, minutes: 8)),
-        isUser: false),
-    Message(
-        message: "yvdefabcz",
-        date: DateTime.now().subtract(const Duration(days: 8, minutes: 9)),
-        isUser: true),
-  ].reversed.toList();
+  final ChatGPTUltils chatGPTUltils = ChatGPTUltils();
+  List<Message> messageList = [];
+
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +40,12 @@ class _ChatPageState extends State<ChatPage> {
             );
           },
         ),
-        title: const Text("Chat GPT"),
+        title: const Text("Chat with OpenAI",
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            )),
       ),
       drawer: Drawer(
         child: ListView(
@@ -77,8 +55,8 @@ class _ChatPageState extends State<ChatPage> {
               height: 100,
               child: DrawerHeader(
                 decoration: BoxDecoration(
-                  // color: Colors.blue,
-                ),
+                    // color: Colors.blue,
+                    ),
                 child: Text(
                   'Settings',
                   style: TextStyle(
@@ -159,7 +137,13 @@ class _ChatPageState extends State<ChatPage> {
             Container(
               margin: const EdgeInsets.all(20),
               child: FilledButton(
-                  onPressed: () {}, child: const Text('Delete all messages')),
+                  onPressed: () {
+                    setState(() {
+                      messageList.clear();
+                      ChatGPTUltils.history.clear();
+                    });
+                  },
+                  child: const Text('Delete all messages')),
             ),
           ],
         ),
@@ -168,8 +152,8 @@ class _ChatPageState extends State<ChatPage> {
         child: Column(children: [
           Expanded(
             child: GroupedListView<Message, DateTime>(
-              order: GroupedListOrder.DESC,
-              reverse: true,
+              // order: GroupedListOrder.DESC,
+              // reverse: true,
               // floatingHeader: true,
               padding: const EdgeInsets.all(10),
               elements: messageList,
@@ -187,22 +171,59 @@ class _ChatPageState extends State<ChatPage> {
                       style: const TextStyle(fontSize: 11.0)),
                 ),
               ),
-              itemBuilder: (context, message) => Bubble(
-                  margin: const BubbleEdges.only(top: 5, bottom: 5),
-                  alignment: message.isUser
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  nip: message.isUser ? BubbleNip.rightTop : BubbleNip.leftTop,
-                  color: message.isUser ? Colors.blue : Colors.grey[200],
-                  child: Text(
-                    message.message,
-                    style: TextStyle(
-                        color: message.isUser ? Colors.white : Colors.black),
-                  )),
+              itemBuilder: (context, message) {
+                var isLastIndex =
+                    messageList.length - 1 == messageList.indexOf(message);
+
+                return Bubble(
+                    margin: const BubbleEdges.only(top: 5, bottom: 5),
+                    alignment: message.isUser
+                        ? Alignment.topRight
+                        : Alignment.topLeft,
+                    nip:
+                        message.isUser ? BubbleNip.rightTop : BubbleNip.leftTop,
+                    color: message.isUser ? Colors.blue : Colors.grey[100],
+                    child: message.isUser
+                        ? Text(
+                            message.message,
+                            style: const TextStyle(color: Colors.white),
+                          )
+                        : isLastIndex
+                            ? FutureBuilder<String?>(
+                                future:
+                                    chatGPTUltils.getResponse(message.message),
+                                builder: (context, snapshot) {
+                                  if (snapshot.hasData &&
+                                      snapshot.data.toString() !=
+                                          messageList.last.message) {
+                                    messageList.removeLast();
+                                    messageList.add(Message(
+                                        message: snapshot.data.toString(),
+                                        date: DateTime.now(),
+                                        isUser: false));
+                                    return Text(
+                                      snapshot.data.toString(),
+                                      style:
+                                          const TextStyle(color: Colors.black),
+                                    );
+                                  } else if (snapshot.hasError) {
+                                    return Text("${snapshot.error}");
+                                  }
+                                  return LoadingAnimationWidget.waveDots(
+                                    color: Colors.blue,
+                                    size: 20,
+                                  );
+                                },
+                              )
+                            : Text(
+                                message.message,
+                                style: const TextStyle(color: Colors.black),
+                              ));
+              },
             ),
           ),
           Container(
-            margin: const EdgeInsets.fromLTRB(30, 30, 30, 0),
+            margin: const EdgeInsets.fromLTRB(30, 30, 30, 15),
             child: TextField(
               decoration: const InputDecoration(
                 border: OutlineInputBorder(
@@ -213,10 +234,16 @@ class _ChatPageState extends State<ChatPage> {
               ),
               controller: textFieldController,
               onSubmitted: (value) {
-                final message =
-                    Message(message: value, date: DateTime.now(), isUser: true);
                 textFieldController.clear();
-                setState(() => messageList.add(message));
+                setState(() {
+                  messageList.add(Message(
+                      message: value, date: DateTime.now(), isUser: true));
+                  messageList.add(Message(
+                      // decoy message
+                      message: value,
+                      date: DateTime.now(),
+                      isUser: false));
+                });
               },
             ),
           )
