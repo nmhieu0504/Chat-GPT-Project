@@ -2,6 +2,7 @@
 
 import 'package:chat_gpt/chat_gpt_api/chat_gpt_ultis.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'package:intl/intl.dart';
 import '../model/message.dart';
@@ -15,10 +16,35 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
+enum TtsState { playing, stopped }
+
+enum TtsLanguage { en, vn }
+
 class _ChatPageState extends State<ChatPage> {
   final textFieldController = TextEditingController();
   final ChatGPTUltils chatGPTUltils = ChatGPTUltils();
   List<Message> messageList = [];
+
+  FlutterTts flutterTts = FlutterTts();
+  TtsLanguage languages = TtsLanguage.en;
+  bool isEnglish = true;
+  bool isVietnamese = false;
+  bool isAutoTTS = true;
+
+  _speak(String text) async {
+    if (languages == TtsLanguage.vn) {
+      await flutterTts.setLanguage("vi-VN");
+    } else {
+      await flutterTts.setLanguage("en-US");
+    }
+    flutterTts.setPitch(1.0);
+    flutterTts.setVolume(1.0);
+    await flutterTts.speak(text);
+  }
+
+  _stop() async {
+    await flutterTts.stop();
+  }
 
   @override
   void initState() {
@@ -40,7 +66,7 @@ class _ChatPageState extends State<ChatPage> {
             );
           },
         ),
-        title: const Text("Chat with OpenAI",
+        title: const Text("Chat",
             style: TextStyle(
               color: Colors.black,
               fontSize: 20,
@@ -71,9 +97,12 @@ class _ChatPageState extends State<ChatPage> {
               leading: const Icon(Icons.play_circle_outline),
               title: const Text('Auto TTS reply'),
               trailing: Switch(
-                value: true,
-                onChanged: (value) {},
-              ),
+                  value: isAutoTTS,
+                  onChanged: (value) {
+                    setState(() {
+                      isAutoTTS = value;
+                    });
+                  }),
             ),
             ListTile(
               leading: const Icon(Icons.language_outlined),
@@ -92,7 +121,12 @@ class _ChatPageState extends State<ChatPage> {
                           child: InkWell(
                             splashColor: Colors.blue.withAlpha(30),
                             onTap: () {
-                              debugPrint('Card tapped.');
+                              Navigator.pop(context);
+                              setState(() {
+                                languages = TtsLanguage.en;
+                                isEnglish = true;
+                                isVietnamese = false;
+                              });
                             },
                             child: ListTile(
                               leading: SizedBox(
@@ -101,6 +135,10 @@ class _ChatPageState extends State<ChatPage> {
                                   child:
                                       Image.asset('assets/images/us_flag.png')),
                               title: const Text('English (United States)'),
+                              trailing: isEnglish
+                                  ? const Icon(Icons.check_circle,
+                                      color: Colors.green)
+                                  : null,
                             ),
                           ),
                         ),
@@ -109,7 +147,12 @@ class _ChatPageState extends State<ChatPage> {
                           child: InkWell(
                             splashColor: Colors.blue.withAlpha(30),
                             onTap: () {
-                              debugPrint('Card tapped.');
+                              Navigator.pop(context);
+                              setState(() {
+                                languages = TtsLanguage.vn;
+                                isEnglish = false;
+                                isVietnamese = true;
+                              });
                             },
                             child: ListTile(
                               leading: SizedBox(
@@ -118,6 +161,10 @@ class _ChatPageState extends State<ChatPage> {
                                   child:
                                       Image.asset('assets/images/vn_flag.png')),
                               title: const Text('Vietnamese'),
+                              trailing: isVietnamese
+                                  ? const Icon(Icons.check_circle,
+                                      color: Colors.green)
+                                  : null,
                             ),
                           ),
                         ),
@@ -143,6 +190,8 @@ class _ChatPageState extends State<ChatPage> {
                       ChatGPTUltils.history.clear();
                     });
                   },
+                  style: ButtonStyle(
+                      backgroundColor: MaterialStateProperty.all(Colors.red)),
                   child: const Text('Delete all messages')),
             ),
           ],
@@ -154,7 +203,7 @@ class _ChatPageState extends State<ChatPage> {
             child: GroupedListView<Message, DateTime>(
               // order: GroupedListOrder.DESC,
               // reverse: true,
-              // floatingHeader: true,
+              addAutomaticKeepAlives: true,
               padding: const EdgeInsets.all(10),
               elements: messageList,
               groupBy: (message) => DateTime(
@@ -172,79 +221,118 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ),
               itemBuilder: (context, message) {
-                var isLastIndex =
-                    messageList.length - 1 == messageList.indexOf(message);
+                var isRequest = (messageList.length - 1 ==
+                        messageList.indexOf(message)) &&
+                    (messageList.elementAt(messageList.length - 2).message ==
+                        message.message);
 
-                return Bubble(
-                    margin: const BubbleEdges.only(top: 5, bottom: 5),
-                    alignment: message.isUser
-                        ? Alignment.topRight
-                        : Alignment.topLeft,
-                    nip:
-                        message.isUser ? BubbleNip.rightTop : BubbleNip.leftTop,
-                    color: message.isUser ? Colors.blue : Colors.grey[100],
-                    child: message.isUser
-                        ? Text(
-                            message.message,
-                            style: const TextStyle(color: Colors.white),
-                          )
-                        : isLastIndex
-                            ? FutureBuilder<String?>(
-                                future:
-                                    chatGPTUltils.getResponse(message.message),
-                                builder: (context, snapshot) {
-                                  if (snapshot.hasData &&
-                                      snapshot.data.toString() !=
-                                          messageList.last.message) {
-                                    messageList.removeLast();
-                                    messageList.add(Message(
-                                        message: snapshot.data.toString(),
-                                        date: DateTime.now(),
-                                        isUser: false));
-                                    return Text(
-                                      snapshot.data.toString(),
-                                      style:
-                                          const TextStyle(color: Colors.black),
-                                    );
-                                  } else if (snapshot.hasError) {
-                                    return Text("${snapshot.error}");
-                                  }
-                                  return LoadingAnimationWidget.waveDots(
-                                    color: Colors.blue,
-                                    size: 20,
-                                  );
-                                },
-                              )
-                            : Text(
+                return Row(children: [
+                  Expanded(
+                    flex: 9,
+                    child: Bubble(
+                        elevation: 5,
+                        margin: const BubbleEdges.only(
+                          top: 5,
+                          bottom: 5,
+                        ),
+                        alignment: message.isUser
+                            ? Alignment.topRight
+                            : Alignment.topLeft,
+                        nip: message.isUser
+                            ? BubbleNip.rightTop
+                            : BubbleNip.leftTop,
+                        color: message.isUser ? Colors.blue : Colors.grey[100],
+                        child: message.isUser
+                            ? Text(
                                 message.message,
-                                style: const TextStyle(color: Colors.black),
-                              ));
+                                style: const TextStyle(color: Colors.white),
+                              )
+                            : isRequest
+                                ? !ChatGPTUltils.isProcessing
+                                    ? FutureBuilder<String?>(
+                                        future: chatGPTUltils
+                                            .getResponse(message.message),
+                                        builder: (context, snapshot) {
+                                          if (snapshot.hasData) {
+                                            print(
+                                                "message remove: ${messageList.last.message}");
+                                            messageList.removeLast();
+                                            messageList.add(Message(
+                                                message:
+                                                    snapshot.data.toString(),
+                                                date: DateTime.now(),
+                                                isUser: false));
+                                            print(
+                                                "message last after remove: ${messageList.last.message}");
+                                            if (isAutoTTS) {
+                                              _speak(snapshot.data.toString());
+                                            }
+                                            return Text(
+                                              snapshot.data.toString(),
+                                              style: const TextStyle(
+                                                  color: Colors.black),
+                                            );
+                                          } else if (snapshot.hasError) {
+                                            return Text("${snapshot.error}");
+                                          }
+                                          return LoadingAnimationWidget
+                                              .waveDots(
+                                            color: Colors.blue,
+                                            size: 20,
+                                          );
+                                        },
+                                      )
+                                    : Container()
+                                : Text(
+                                    message.message,
+                                    style: const TextStyle(color: Colors.blue),
+                                  )),
+                  ),
+                  message.isUser
+                      ? Container()
+                      : Expanded(
+                          flex: 1,
+                          child: IconButton(
+                              onPressed: () {
+                                _speak(message.message);
+                              },
+                              icon: const Icon(Icons.play_circle_outline)),
+                        )
+                ]);
               },
             ),
           ),
           Container(
             margin: const EdgeInsets.fromLTRB(30, 30, 30, 15),
             child: TextField(
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(
                     borderRadius: BorderRadius.all(Radius.circular(40.0))),
-                hintText: "Typing something ...",
-                contentPadding:
-                    EdgeInsets.only(top: 10, bottom: 10, left: 20, right: 20),
+                hintText: "Start typing or talking ...",
+                contentPadding: const EdgeInsets.only(
+                    top: 10, bottom: 10, left: 20, right: 20),
+                suffixIcon: IconButton(
+                  icon: const Icon(
+                    Icons.send,
+                    color: Colors.blue,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      messageList.add(Message(
+                          message: textFieldController.text,
+                          date: DateTime.now(),
+                          isUser: true));
+                      messageList.add(Message(
+                          // decoy message
+                          message: textFieldController.text,
+                          date: DateTime.now(),
+                          isUser: false));
+                    });
+                    textFieldController.clear();
+                  },
+                ),
               ),
               controller: textFieldController,
-              onSubmitted: (value) {
-                textFieldController.clear();
-                setState(() {
-                  messageList.add(Message(
-                      message: value, date: DateTime.now(), isUser: true));
-                  messageList.add(Message(
-                      // decoy message
-                      message: value,
-                      date: DateTime.now(),
-                      isUser: false));
-                });
-              },
             ),
           )
         ]),
@@ -266,10 +354,12 @@ class _ChatPageState extends State<ChatPage> {
                 Icons.mic_outlined,
                 color: Colors.white,
               )),
-          const Text(
+          Text(
             "Tap to Talk",
             style: TextStyle(
-                fontStyle: FontStyle.italic, fontSize: 18, color: Colors.black),
+                fontStyle: FontStyle.italic,
+                fontSize: 18,
+                color: Colors.blue[600]),
           )
         ]),
       ),

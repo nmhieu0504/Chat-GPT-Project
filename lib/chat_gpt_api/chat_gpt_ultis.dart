@@ -8,6 +8,7 @@ class ChatGPTUltils {
   static OpenAI openAI = OpenAI.instance.build(
       token: API_Const.API_KEY,
       baseOption: HttpSetup(receiveTimeout: const Duration(seconds: 60)));
+  static bool isProcessing = false;
 
   static final ChatGPTUltils _chatGPTUltils = ChatGPTUltils._internal();
   ChatGPTUltils._internal();
@@ -15,6 +16,7 @@ class ChatGPTUltils {
 
   Future<String?> getResponse(String inputMessage) async {
     try {
+      isProcessing = true;
       print("Message enter: $inputMessage \nMessage processing...");
       history.add({"role": "user", "content": inputMessage});
 
@@ -30,6 +32,7 @@ class ChatGPTUltils {
         history.add({"role": "assistant", "content": botMessage});
 
         print("Message received: $botMessage");
+        isProcessing = false;
         return botMessage;
       }
     } catch (err) {
