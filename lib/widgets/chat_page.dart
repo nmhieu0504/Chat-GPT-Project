@@ -33,12 +33,13 @@ class _ChatPageState extends State<ChatPage> {
   bool isVietnamese = false;
   bool isAutoTTS = true;
   bool isButtonDisabled = ChatGPTUltils.isProcessing;
+  bool isSpeaking = false;
 
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
   double _confidence = 1.0;
 
-  _speak(String text) async {
+  Future _speak(String text) async {
     if (languages == TtsLanguage.vn) {
       await flutterTts.setLanguage("vi-VN");
     } else {
@@ -47,6 +48,12 @@ class _ChatPageState extends State<ChatPage> {
     flutterTts.setPitch(1.0);
     flutterTts.setVolume(1.0);
     await flutterTts.speak(text);
+    var isDoneSpeaking = await flutterTts.awaitSpeakCompletion(true);
+    if (isDoneSpeaking == 1) {
+      setState(() {
+        isSpeaking = false;
+      });
+    }
   }
 
   _stop() async {
@@ -71,21 +78,17 @@ class _ChatPageState extends State<ChatPage> {
         );
       }
     } else {
+      _speech.stop();
       setState(() {
         _isListening = false;
         isButtonDisabled = true;
-        textFieldController.clear();
-
-        // messageList.add(Message(
-        //     message: textFieldController.text,
-        //     date: DateTime.now(),
-        //     isUser: true));
-        // messageList.add(Message(
-        //     message: textFieldController.text,
-        //     date: DateTime.now(),
-        //     isUser: false));
+        var message = textFieldController.text;
+        textFieldController.text = "";
+        messageList
+            .add(Message(message: message, date: DateTime.now(), isUser: true));
+        messageList.add(
+            Message(message: message, date: DateTime.now(), isUser: false));
       });
-      _speech.stop();
     }
   }
 
@@ -216,6 +219,47 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
+  Widget chatResponseWithSpeech(String message) {
+    return Row(children: [
+      Expanded(
+        flex: 9,
+        child: Bubble(
+            elevation: 5,
+            margin: const BubbleEdges.only(
+              top: 5,
+              bottom: 5,
+            ),
+            alignment: Alignment.topLeft,
+            nip: BubbleNip.leftTop,
+            color: Colors.grey[100],
+            child: Text(
+              message,
+              style: const TextStyle(color: Colors.black),
+            )),
+      ),
+      Expanded(
+        flex: 1,
+        child: IconButton(
+            onPressed: () {
+              setState(() {
+                isSpeaking = !isSpeaking;
+                if (isSpeaking) {
+                  _speak(message);
+                } else {
+                  _stop();
+                }
+              });
+            },
+            icon: isSpeaking
+                ? LoadingAnimationWidget.beat(
+                    color: Colors.red.shade300,
+                    size: 20,
+                  )
+                : const Icon(Icons.play_circle_outline)),
+      )
+    ]);
+  }
+
   Widget _buildMessageListView() {
     return Expanded(
       child: GroupedListView<Message, DateTime>(
@@ -238,85 +282,68 @@ class _ChatPageState extends State<ChatPage> {
                 style: const TextStyle(fontSize: 11.0)),
           ),
         ),
-        itemBuilder: (context, message) {
-          var isRequest =
-              (messageList.length - 1 == messageList.indexOf(message)) &&
-                  (messageList.elementAt(messageList.length - 2).message ==
-                      message.message);
+        indexedItemBuilder: (context, message, index) {
+          var isRequest = (index == messageList.length - 1) &&
+              (messageList.elementAt(index - 1).message == message.message);
 
-          return Row(children: [
-            Expanded(
-              flex: 9,
-              child: Bubble(
+          return message.isUser
+              ? Bubble(
                   elevation: 5,
                   margin: const BubbleEdges.only(
                     top: 5,
                     bottom: 5,
                   ),
-                  alignment:
-                      message.isUser ? Alignment.topRight : Alignment.topLeft,
-                  nip: message.isUser ? BubbleNip.rightTop : BubbleNip.leftTop,
-                  color: message.isUser ? Colors.blue : Colors.grey[100],
-                  child: message.isUser
-                      ? Text(
-                          message.message,
-                          style: const TextStyle(color: Colors.white),
-                        )
-                      : isRequest
-                          ? !ChatGPTUltils.isProcessing
-                              ? FutureBuilder<String?>(
-                                  future: chatGPTUltils
-                                      .getResponse(message.message),
-                                  builder: (context, snapshot) {
-                                    if (snapshot.hasData) {
-                                      print(
-                                          "message remove: ${messageList.last.message}");
-                                      messageList.removeLast();
-                                      messageList.add(Message(
-                                          message: snapshot.data.toString(),
-                                          date: DateTime.now(),
-                                          isUser: false));
-                                      print(
-                                          "message last after remove: ${messageList.last.message}");
-                                      if (isAutoTTS) {
-                                        _speak(snapshot.data.toString());
-                                      }
-                                      Future.delayed(Duration.zero, () {
-                                        setState(() {
-                                          isButtonDisabled = false;
-                                        });
-                                      });
-                                      return Text(
-                                        snapshot.data.toString(),
-                                        style: const TextStyle(
-                                            color: Colors.black),
-                                      );
-                                    } else if (snapshot.hasError) {
-                                      return Text("${snapshot.error}");
-                                    }
-                                    return LoadingAnimationWidget.waveDots(
-                                      color: Colors.blue,
-                                      size: 20,
-                                    );
-                                  },
-                                )
-                              : Container()
-                          : Text(
-                              message.message,
-                              style: const TextStyle(color: Colors.blue),
-                            )),
-            ),
-            message.isUser
-                ? Container()
-                : Expanded(
-                    flex: 1,
-                    child: IconButton(
-                        onPressed: () {
-                          _speak(message.message);
-                        },
-                        icon: const Icon(Icons.play_circle_outline)),
-                  )
-          ]);
+                  alignment: Alignment.topRight,
+                  nip: BubbleNip.rightTop,
+                  color: Colors.blue,
+                  child: Text(
+                    message.message,
+                    style: const TextStyle(color: Colors.white),
+                  ))
+              : isRequest
+                  ? FutureBuilder<String?>(
+                      future: chatGPTUltils.getResponse(message.message),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasData) {
+                          print("message remove: ${messageList.last.message}");
+                          messageList.removeLast();
+                          messageList.add(Message(
+                              message: snapshot.data.toString(),
+                              date: DateTime.now(),
+                              isUser: false));
+                          print(
+                              "message last after remove: ${messageList.last.message}");
+                          if (isAutoTTS) {
+                            isSpeaking = true;
+                            _speak(snapshot.data.toString());
+                          }
+                          Future.delayed(Duration.zero, () {
+                            setState(() {
+                              isButtonDisabled = false;
+                            });
+                          });
+                          return chatResponseWithSpeech(
+                              snapshot.data.toString());
+                        } else if (snapshot.hasError) {
+                          return Text("${snapshot.error}");
+                        }
+                        return Bubble(
+                          elevation: 5,
+                          margin: const BubbleEdges.only(
+                            top: 5,
+                            bottom: 5,
+                          ),
+                          alignment: Alignment.topLeft,
+                          nip: BubbleNip.leftTop,
+                          color: Colors.grey[100],
+                          child: LoadingAnimationWidget.waveDots(
+                            color: Colors.blue,
+                            size: 20,
+                          ),
+                        );
+                      },
+                    )
+                  : chatResponseWithSpeech(message.message);
         },
       ),
     );
