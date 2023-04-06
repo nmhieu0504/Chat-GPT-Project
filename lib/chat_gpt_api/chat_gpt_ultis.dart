@@ -14,7 +14,7 @@ class ChatGPTUltils {
   ChatGPTUltils._internal();
   factory ChatGPTUltils() => _chatGPTUltils;
 
-  Future<String?> getResponse(String inputMessage) async {
+  Future<String> getResponse(String inputMessage) async {
     try {
       isProcessing = true;
       print("Message enter: $inputMessage \nMessage processing...");
@@ -38,6 +38,6 @@ class ChatGPTUltils {
     } catch (err) {
       print(err.toString());
     }
-    return null;
+    return "Something went wrong!";
   }
 }

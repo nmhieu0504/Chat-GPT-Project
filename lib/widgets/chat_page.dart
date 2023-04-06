@@ -1,10 +1,12 @@
 // ignore_for_file: avoid_print
 
 import 'package:chat_gpt/chat_gpt_api/chat_gpt_ultis.dart';
+import 'package:chat_gpt/model/db_ultils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:grouped_list/grouped_list.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../model/message.dart';
 import 'package:bubble/bubble.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
@@ -31,13 +33,30 @@ class _ChatPageState extends State<ChatPage> {
   TtsLanguage languages = TtsLanguage.en;
   bool isEnglish = true;
   bool isVietnamese = false;
+
   bool isAutoTTS = true;
+
   bool isButtonDisabled = ChatGPTUltils.isProcessing;
   bool isSpeaking = false;
 
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
-  double _confidence = 1.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      isAutoTTS = prefs.getBool('isAutoTTS') ?? true;
+      isEnglish = prefs.getBool('isEnglish') ?? false;
+      isVietnamese = prefs.getBool('isVietnamese') ?? false;
+    });
+    languages = isEnglish ? TtsLanguage.en : TtsLanguage.vn;
+  }
 
   Future _speak(String text) async {
     if (languages == TtsLanguage.vn) {
@@ -57,6 +76,9 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   _stop() async {
+    setState(() {
+      isSpeaking = false;
+    });
     await flutterTts.stop();
   }
 
@@ -71,24 +93,25 @@ class _ChatPageState extends State<ChatPage> {
         _speech.listen(
           onResult: (val) => setState(() {
             textFieldController.text = val.recognizedWords;
-            if (val.hasConfidenceRating && val.confidence > 0) {
-              _confidence = val.confidence;
-            }
+            // if (val.hasConfidenceRating && val.confidence > 0) {
+            //   _confidence = val.confidence;
+            // }
           }),
         );
       }
     } else {
+      var message = textFieldController.text;
+      textFieldController.clear();
       _speech.stop();
+      // DB_Ultils.insertMessage(
+      //     Message(message: message, date: DateTime.now(), isUser: true));
       setState(() {
         _isListening = false;
         isButtonDisabled = true;
-        var message = textFieldController.text;
-        textFieldController.text = "";
         messageList
             .add(Message(message: message, date: DateTime.now(), isUser: true));
-        messageList.add(
-            Message(message: message, date: DateTime.now(), isUser: false));
       });
+      _sendRequest(message);
     }
   }
 
@@ -118,16 +141,20 @@ class _ChatPageState extends State<ChatPage> {
             title: const Text('Auto TTS reply'),
             trailing: Switch(
                 value: isAutoTTS,
-                onChanged: (value) {
+                onChanged: (value) async {
                   setState(() {
                     isAutoTTS = value;
                   });
+                  // obtain shared preferences
+                  final prefs = await SharedPreferences.getInstance();
+                  // set value
+                  await prefs.setBool('isAutoTTS', value);
                 }),
           ),
           ListTile(
             leading: const Icon(Icons.language_outlined),
             title: const Text('Speech Language'),
-            onTap: () => showDialog<String>(
+            onTap: () => showDialog<void>(
               context: context,
               builder: (BuildContext context) => Dialog(
                 child: Padding(
@@ -140,13 +167,18 @@ class _ChatPageState extends State<ChatPage> {
                         clipBehavior: Clip.hardEdge,
                         child: InkWell(
                           splashColor: Colors.blue.withAlpha(30),
-                          onTap: () {
+                          onTap: () async {
                             Navigator.pop(context);
                             setState(() {
                               languages = TtsLanguage.en;
                               isEnglish = true;
                               isVietnamese = false;
                             });
+                            // obtain shared preferences
+                            final prefs = await SharedPreferences.getInstance();
+                            // set value
+                            await prefs.setBool('isEnglish', isEnglish);
+                            await prefs.setBool('isVietnamese', isVietnamese);
                           },
                           child: ListTile(
                             leading: SizedBox(
@@ -166,13 +198,19 @@ class _ChatPageState extends State<ChatPage> {
                         clipBehavior: Clip.hardEdge,
                         child: InkWell(
                           splashColor: Colors.blue.withAlpha(30),
-                          onTap: () {
+                          onTap: () async {
                             Navigator.pop(context);
                             setState(() {
                               languages = TtsLanguage.vn;
                               isEnglish = false;
                               isVietnamese = true;
                             });
+
+                            // obtain shared preferences
+                            final prefs = await SharedPreferences.getInstance();
+                            // set value
+                            await prefs.setBool('isEnglish', isEnglish);
+                            await prefs.setBool('isVietnamese', isVietnamese);
                           },
                           child: ListTile(
                             leading: SizedBox(
@@ -206,8 +244,44 @@ class _ChatPageState extends State<ChatPage> {
             child: FilledButton(
                 onPressed: () {
                   setState(() {
-                    messageList.clear();
-                    ChatGPTUltils.history.clear();
+                    showDialog<void>(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: const Text('Delete all messages?'),
+                          content: const Text('This action cannot be undone, '
+                              'are you sure you want to continue?'),
+                          actions: <Widget>[
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                textStyle:
+                                    Theme.of(context).textTheme.labelLarge,
+                              ),
+                              child: const Text('Yes',
+                                  style: TextStyle(color: Colors.red)),
+                              onPressed: () {
+                                setState(() {
+                                  messageList.clear();
+                                  ChatGPTUltils.history.clear();
+                                });
+                                // DB_Ultils.deleteAll();
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                textStyle:
+                                    Theme.of(context).textTheme.labelLarge,
+                              ),
+                              child: const Text('No'),
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                              },
+                            ),
+                          ],
+                        );
+                      },
+                    );
                   });
                 },
                 style: ButtonStyle(
@@ -217,47 +291,6 @@ class _ChatPageState extends State<ChatPage> {
         ],
       ),
     );
-  }
-
-  Widget chatResponseWithSpeech(String message) {
-    return Row(children: [
-      Expanded(
-        flex: 9,
-        child: Bubble(
-            elevation: 5,
-            margin: const BubbleEdges.only(
-              top: 5,
-              bottom: 5,
-            ),
-            alignment: Alignment.topLeft,
-            nip: BubbleNip.leftTop,
-            color: Colors.grey[100],
-            child: Text(
-              message,
-              style: const TextStyle(color: Colors.black),
-            )),
-      ),
-      Expanded(
-        flex: 1,
-        child: IconButton(
-            onPressed: () {
-              setState(() {
-                isSpeaking = !isSpeaking;
-                if (isSpeaking) {
-                  _speak(message);
-                } else {
-                  _stop();
-                }
-              });
-            },
-            icon: isSpeaking
-                ? LoadingAnimationWidget.beat(
-                    color: Colors.red.shade300,
-                    size: 20,
-                  )
-                : const Icon(Icons.play_circle_outline)),
-      )
-    ]);
   }
 
   Widget _buildMessageListView() {
@@ -283,9 +316,6 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ),
         indexedItemBuilder: (context, message, index) {
-          var isRequest = (index == messageList.length - 1) &&
-              (messageList.elementAt(index - 1).message == message.message);
-
           return message.isUser
               ? Bubble(
                   elevation: 5,
@@ -300,53 +330,74 @@ class _ChatPageState extends State<ChatPage> {
                     message.message,
                     style: const TextStyle(color: Colors.white),
                   ))
-              : isRequest
-                  ? FutureBuilder<String?>(
-                      future: chatGPTUltils.getResponse(message.message),
-                      builder: (context, snapshot) {
-                        if (snapshot.hasData) {
-                          print("message remove: ${messageList.last.message}");
-                          messageList.removeLast();
-                          messageList.add(Message(
-                              message: snapshot.data.toString(),
-                              date: DateTime.now(),
-                              isUser: false));
-                          print(
-                              "message last after remove: ${messageList.last.message}");
-                          if (isAutoTTS) {
-                            isSpeaking = true;
-                            _speak(snapshot.data.toString());
-                          }
-                          Future.delayed(Duration.zero, () {
-                            setState(() {
-                              isButtonDisabled = false;
-                            });
+              : Row(children: [
+                  Expanded(
+                    flex: 9,
+                    child: Bubble(
+                        elevation: 5,
+                        margin: const BubbleEdges.only(
+                          top: 5,
+                          bottom: 5,
+                        ),
+                        alignment: Alignment.topLeft,
+                        nip: BubbleNip.leftTop,
+                        color: Colors.grey[100],
+                        child: Text(
+                          message.message,
+                          style: const TextStyle(color: Colors.black),
+                        )),
+                  ),
+                  Expanded(
+                    flex: 1,
+                    child: IconButton(
+                        onPressed: () {
+                          setState(() {
+                            message.state = !message.state;
+                            // if (isPlaying) {
+                            //   isPlaying = false;
+                            //   _stop();
+                            // } else {
+                            //   if (isSpeaking) {
+                            //     _stop();
+                            //     isPlaying = true;
+                            //     isSpeaking = true;
+                            //     _speak(message);
+                            //   } else {
+                            //     isPlaying = true;
+                            //     isSpeaking = true;
+                            //     _speak(message);
+                            //   }
+                            // }
                           });
-                          return chatResponseWithSpeech(
-                              snapshot.data.toString());
-                        } else if (snapshot.hasError) {
-                          return Text("${snapshot.error}");
-                        }
-                        return Bubble(
-                          elevation: 5,
-                          margin: const BubbleEdges.only(
-                            top: 5,
-                            bottom: 5,
-                          ),
-                          alignment: Alignment.topLeft,
-                          nip: BubbleNip.leftTop,
-                          color: Colors.grey[100],
-                          child: LoadingAnimationWidget.waveDots(
-                            color: Colors.blue,
-                            size: 20,
-                          ),
-                        );
-                      },
-                    )
-                  : chatResponseWithSpeech(message.message);
+                          // if (message.state) {
+                          //   _speak(message.message);
+                          // } else {
+                          //   _stop();
+                          // }
+                        },
+                        icon: message.state
+                            ? LoadingAnimationWidget.beat(
+                                color: Colors.blue,
+                                size: 20,
+                              )
+                            : const Icon(
+                                Icons.play_circle_outline,
+                                color: Colors.blue,
+                              )),
+                  )
+                ]);
         },
       ),
     );
+  }
+
+  Future<void> _sendRequest(String message) async {
+    String result = await chatGPTUltils.getResponse(message);
+    setState(() {
+      messageList
+          .add(Message(message: result, date: DateTime.now(), isUser: false));
+      isButtonDisabled = false;
+    });
   }
 
   Widget _buildInputMessage() {
@@ -362,26 +413,28 @@ class _ChatPageState extends State<ChatPage> {
           contentPadding:
               const EdgeInsets.only(top: 10, bottom: 10, left: 20, right: 20),
           suffixIcon: IconButton(
-            icon: Icon(
-              Icons.send,
-              color: isButtonDisabled ? null : Colors.blue,
-            ),
+            icon: !isButtonDisabled
+                ? const Icon(
+                    Icons.send,
+                    color: Colors.blue,
+                  )
+                : LoadingAnimationWidget.discreteCircle(
+                    color: Colors.blue,
+                    size: 20,
+                  ),
             onPressed: () {
-              isButtonDisabled
-                  ? null
-                  : setState(() {
-                      isButtonDisabled = true;
-                      messageList.add(Message(
-                          message: textFieldController.text,
-                          date: DateTime.now(),
-                          isUser: true));
-                      messageList.add(Message(
-                          // decoy message
-                          message: textFieldController.text,
-                          date: DateTime.now(),
-                          isUser: false));
-                    });
+              String text = textFieldController.text;
               textFieldController.clear();
+              setState(() {
+                isButtonDisabled = true;
+                messageList.add(
+                    Message(message: text, date: DateTime.now(), isUser: true));
+              });
+              _sendRequest(text);
+              // DB_Ultils.insertMessage(Message(
+              //     message: textFieldController.text,
+              //     date: DateTime.now(),
+              //     isUser: true));
             },
           ),
         ),
@@ -421,11 +474,6 @@ class _ChatPageState extends State<ChatPage> {
         )
       ]),
     );
-  }
-
-  @override
-  void initState() {
-    super.initState();
   }
 
   @override
