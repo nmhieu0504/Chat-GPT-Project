@@ -46,6 +46,7 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     _loadSettings();
+    _loadMessage();
   }
 
   Future<void> _loadSettings() async {
@@ -56,6 +57,11 @@ class _ChatPageState extends State<ChatPage> {
       isVietnamese = prefs.getBool('isVietnamese') ?? false;
     });
     languages = isEnglish ? TtsLanguage.en : TtsLanguage.vn;
+  }
+
+  Future<void> _loadMessage() async {
+    messageList = await DB_Ultils.loadAll();
+    setState(() {});
   }
 
   Future _speak(String text) async {
@@ -103,8 +109,8 @@ class _ChatPageState extends State<ChatPage> {
       var message = textFieldController.text;
       textFieldController.clear();
       _speech.stop();
-      // DB_Ultils.insertMessage(
-      //     Message(message: message, date: DateTime.now(), isUser: true));
+      DB_Ultils.insertMessage(
+          Message(message: message, date: DateTime.now(), isUser: true));
       setState(() {
         _isListening = false;
         isButtonDisabled = true;
@@ -148,7 +154,7 @@ class _ChatPageState extends State<ChatPage> {
                   // obtain shared preferences
                   final prefs = await SharedPreferences.getInstance();
                   // set value
-                  await prefs.setBool('isAutoTTS', value);
+                  prefs.setBool('isAutoTTS', value);
                 }),
           ),
           ListTile(
@@ -177,8 +183,8 @@ class _ChatPageState extends State<ChatPage> {
                             // obtain shared preferences
                             final prefs = await SharedPreferences.getInstance();
                             // set value
-                            await prefs.setBool('isEnglish', isEnglish);
-                            await prefs.setBool('isVietnamese', isVietnamese);
+                            prefs.setBool('isEnglish', isEnglish);
+                            prefs.setBool('isVietnamese', isVietnamese);
                           },
                           child: ListTile(
                             leading: SizedBox(
@@ -209,8 +215,8 @@ class _ChatPageState extends State<ChatPage> {
                             // obtain shared preferences
                             final prefs = await SharedPreferences.getInstance();
                             // set value
-                            await prefs.setBool('isEnglish', isEnglish);
-                            await prefs.setBool('isVietnamese', isVietnamese);
+                            prefs.setBool('isEnglish', isEnglish);
+                            prefs.setBool('isVietnamese', isVietnamese);
                           },
                           child: ListTile(
                             leading: SizedBox(
@@ -264,7 +270,7 @@ class _ChatPageState extends State<ChatPage> {
                                   messageList.clear();
                                   ChatGPTUltils.history.clear();
                                 });
-                                // DB_Ultils.deleteAll();
+                                DB_Ultils.deleteAll();
                                 Navigator.of(context).pop();
                               },
                             ),
@@ -398,6 +404,8 @@ class _ChatPageState extends State<ChatPage> {
           .add(Message(message: result, date: DateTime.now(), isUser: false));
       isButtonDisabled = false;
     });
+    DB_Ultils.insertMessage(
+        Message(message: result, date: DateTime.now(), isUser: false));
   }
 
   Widget _buildInputMessage() {
@@ -430,11 +438,11 @@ class _ChatPageState extends State<ChatPage> {
                 messageList.add(
                     Message(message: text, date: DateTime.now(), isUser: true));
               });
+              DB_Ultils.insertMessage(Message(
+                  message: text,
+                  date: DateTime.now(),
+                  isUser: true));
               _sendRequest(text);
-              // DB_Ultils.insertMessage(Message(
-              //     message: textFieldController.text,
-              //     date: DateTime.now(),
-              //     isUser: true));
             },
           ),
         ),
