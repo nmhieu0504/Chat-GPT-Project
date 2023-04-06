@@ -38,6 +38,6 @@ class ChatGPTUltils {
     } catch (err) {
       print(err.toString());
     }
-    return "Something went wrong!";
+    return "Something went wrong. Please try again later :<";
   }
 }

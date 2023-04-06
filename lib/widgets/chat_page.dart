@@ -61,6 +61,12 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _loadMessage() async {
     messageList = await DB_Ultils.loadAll();
+    for (var element in messageList) {
+      ChatGPTUltils.history.add({
+        "role": element.isUser ? "user" : "assistant",
+        "content": element.message
+      });
+    }
     setState(() {});
   }
 
@@ -438,10 +444,8 @@ class _ChatPageState extends State<ChatPage> {
                 messageList.add(
                     Message(message: text, date: DateTime.now(), isUser: true));
               });
-              DB_Ultils.insertMessage(Message(
-                  message: text,
-                  date: DateTime.now(),
-                  isUser: true));
+              DB_Ultils.insertMessage(
+                  Message(message: text, date: DateTime.now(), isUser: true));
               _sendRequest(text);
             },
           ),
