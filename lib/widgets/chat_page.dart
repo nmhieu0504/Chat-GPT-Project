@@ -365,6 +365,11 @@ class _ChatPageState extends State<ChatPage> {
                         onPressed: () {
                           setState(() {
                             message.state = !message.state;
+                            if (message.state) {
+                              _speak(message.message);
+                            } else {
+                              _stop();
+                            }
                             // if (isPlaying) {
                             //   isPlaying = false;
                             //   _stop();
@@ -410,6 +415,9 @@ class _ChatPageState extends State<ChatPage> {
           .add(Message(message: result, date: DateTime.now(), isUser: false));
       isButtonDisabled = false;
     });
+    if (isAutoTTS) {
+      _speak(result);
+    }
     DB_Ultils.insertMessage(
         Message(message: result, date: DateTime.now(), isUser: false));
   }
@@ -478,7 +486,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ),
         Text(
-          "Tap to Talk",
+          _isListening ? "Listening..." : "Tap to Talk",
           style: TextStyle(
               fontStyle: FontStyle.italic,
               fontSize: 18,

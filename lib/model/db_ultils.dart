@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_print, curly_braces_in_flow_control_structures
+// ignore_for_file: avoid_print, curly_braces_in_flow_control_structures, camel_case_types
 
 import 'dart:async';
 
