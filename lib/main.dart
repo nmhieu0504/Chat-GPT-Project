@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
         [DeviceOrientation.portraitUp, DeviceOrientation.portraitDown]);
     return MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(useMaterial3: true),
+        theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
         home: const ChatPage());
   }
 }

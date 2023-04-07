@@ -31,8 +31,8 @@ class _ChatPageState extends State<ChatPage> {
 
   FlutterTts flutterTts = FlutterTts();
   TtsLanguage languages = TtsLanguage.en;
-  bool isEnglish = true;
-  bool isVietnamese = false;
+  late bool isEnglish;
+  late bool isVietnamese;
 
   bool isAutoTTS = true;
 
@@ -53,7 +53,7 @@ class _ChatPageState extends State<ChatPage> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       isAutoTTS = prefs.getBool('isAutoTTS') ?? true;
-      isEnglish = prefs.getBool('isEnglish') ?? false;
+      isEnglish = prefs.getBool('isEnglish') ?? true;
       isVietnamese = prefs.getBool('isVietnamese') ?? false;
     });
     languages = isEnglish ? TtsLanguage.en : TtsLanguage.vn;
@@ -133,7 +133,7 @@ class _ChatPageState extends State<ChatPage> {
         padding: EdgeInsets.zero,
         children: <Widget>[
           const SizedBox(
-            height: 100,
+            height: 120,
             child: DrawerHeader(
               decoration: BoxDecoration(
                   // color: Colors.blue,
@@ -152,6 +152,7 @@ class _ChatPageState extends State<ChatPage> {
             leading: const Icon(Icons.play_circle_outline),
             title: const Text('Auto TTS reply'),
             trailing: Switch(
+                activeColor: Colors.blue,
                 value: isAutoTTS,
                 onChanged: (value) async {
                   setState(() {
@@ -260,9 +261,9 @@ class _ChatPageState extends State<ChatPage> {
                       context: context,
                       builder: (BuildContext context) {
                         return AlertDialog(
-                          title: const Text('Delete all messages?'),
-                          content: const Text('This action cannot be undone, '
-                              'are you sure you want to continue?'),
+                          title: const Text('Delete all messages'),
+                          content: const Text('This action cannot be undone. '
+                              'Do you want to continue?'),
                           actions: <Widget>[
                             TextButton(
                               style: TextButton.styleFrom(
@@ -343,8 +344,9 @@ class _ChatPageState extends State<ChatPage> {
                     style: const TextStyle(color: Colors.white),
                   ))
               : Row(children: [
-                  Expanded(
-                    flex: 9,
+                  Container(
+                    constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.8),
                     child: Bubble(
                         elevation: 5,
                         margin: const BubbleEdges.only(
@@ -359,49 +361,46 @@ class _ChatPageState extends State<ChatPage> {
                           style: const TextStyle(color: Colors.black),
                         )),
                   ),
-                  Expanded(
-                    flex: 1,
-                    child: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            message.state = !message.state;
-                            if (message.state) {
-                              _speak(message.message);
-                            } else {
-                              _stop();
-                            }
-                            // if (isPlaying) {
-                            //   isPlaying = false;
-                            //   _stop();
-                            // } else {
-                            //   if (isSpeaking) {
-                            //     _stop();
-                            //     isPlaying = true;
-                            //     isSpeaking = true;
-                            //     _speak(message);
-                            //   } else {
-                            //     isPlaying = true;
-                            //     isSpeaking = true;
-                            //     _speak(message);
-                            //   }
-                            // }
-                          });
-                          // if (message.state) {
-                          //   _speak(message.message);
-                          // } else {
+                  IconButton(
+                      onPressed: () {
+                        setState(() {
+                          message.state = !message.state;
+                          if (message.state) {
+                            _speak(message.message);
+                          } else {
+                            _stop();
+                          }
+                          // if (isPlaying) {
+                          //   isPlaying = false;
                           //   _stop();
+                          // } else {
+                          //   if (isSpeaking) {
+                          //     _stop();
+                          //     isPlaying = true;
+                          //     isSpeaking = true;
+                          //     _speak(message);
+                          //   } else {
+                          //     isPlaying = true;
+                          //     isSpeaking = true;
+                          //     _speak(message);
+                          //   }
                           // }
-                        },
-                        icon: message.state
-                            ? LoadingAnimationWidget.beat(
-                                color: Colors.blue,
-                                size: 20,
-                              )
-                            : const Icon(
-                                Icons.play_circle_outline,
-                                color: Colors.blue,
-                              )),
-                  )
+                        });
+                        // if (message.state) {
+                        //   _speak(message.message);
+                        // } else {
+                        //   _stop();
+                        // }
+                      },
+                      icon: message.state
+                          ? LoadingAnimationWidget.beat(
+                              color: Colors.blue,
+                              size: 20,
+                            )
+                          : const Icon(
+                              Icons.play_circle_outline,
+                              color: Colors.blue,
+                            ))
                 ]);
         },
       ),
@@ -425,74 +424,86 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildInputMessage() {
     return Container(
       margin: const EdgeInsets.fromLTRB(30, 15, 30, 15),
-      child: TextField(
-        keyboardType: TextInputType.multiline,
-        maxLines: null,
-        decoration: InputDecoration(
-          border: const OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(40.0))),
-          hintText: "Start typing or talking ...",
-          contentPadding:
-              const EdgeInsets.only(top: 10, bottom: 10, left: 20, right: 20),
-          suffixIcon: IconButton(
-            icon: !isButtonDisabled
-                ? const Icon(
-                    Icons.send,
-                    color: Colors.blue,
-                  )
-                : LoadingAnimationWidget.discreteCircle(
-                    color: Colors.blue,
-                    size: 20,
-                  ),
-            onPressed: () {
-              String text = textFieldController.text;
-              textFieldController.clear();
-              setState(() {
-                isButtonDisabled = true;
-                messageList.add(
-                    Message(message: text, date: DateTime.now(), isUser: true));
-              });
-              DB_Ultils.insertMessage(
-                  Message(message: text, date: DateTime.now(), isUser: true));
-              _sendRequest(text);
-            },
-          ),
+      child: Theme(
+        data: ThemeData(
+          primaryColor: Colors.blue,
+          primaryColorDark: Colors.blue,
         ),
-        controller: textFieldController,
+        child: TextField(
+          keyboardType: TextInputType.multiline,
+          maxLines: null,
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(40.0))),
+            hintText: "Start typing or talking ...",
+            contentPadding:
+                const EdgeInsets.only(top: 10, bottom: 10, left: 20, right: 20),
+            suffixIcon: IconButton(
+              icon: !isButtonDisabled
+                  ? const Icon(
+                      Icons.send,
+                      color: Colors.blue,
+                    )
+                  : LoadingAnimationWidget.discreteCircle(
+                      color: Colors.blue,
+                      size: 20,
+                    ),
+              onPressed: () {
+                String text = textFieldController.text;
+                textFieldController.clear();
+                setState(() {
+                  isButtonDisabled = true;
+                  messageList.add(Message(
+                      message: text, date: DateTime.now(), isUser: true));
+                });
+                DB_Ultils.insertMessage(
+                    Message(message: text, date: DateTime.now(), isUser: true));
+                _sendRequest(text);
+              },
+            ),
+          ),
+          controller: textFieldController,
+        ),
       ),
     );
   }
 
   Widget _buildBottomNavigationBar() {
     return Container(
-      width: 110,
-      height: 110,
       margin: const EdgeInsets.fromLTRB(0, 0, 0, 20),
-      child: Column(children: [
-        AvatarGlow(
-          animate: _isListening,
-          glowColor: Theme.of(context).primaryColor,
-          endRadius: 40.0,
-          duration: const Duration(milliseconds: 2000),
-          repeatPauseDuration: const Duration(milliseconds: 100),
-          repeat: true,
-          child: FloatingActionButton(
-            backgroundColor: Colors.blue,
-            onPressed: _listen,
-            child: Icon(
-              _isListening ? Icons.mic : Icons.mic_none,
-              color: Colors.white,
+      child: SingleChildScrollView(
+        child: Column(children: [
+          AvatarGlow(
+            animate: _isListening,
+            glowColor: Theme.of(context).primaryColor,
+            endRadius: 50.0,
+            duration: const Duration(milliseconds: 2000),
+            repeatPauseDuration: const Duration(milliseconds: 100),
+            repeat: true,
+            child: SizedBox(
+              height: 80.0,
+              width: 80.0,
+              child: ElevatedButton(
+                style: ButtonStyle(
+                    backgroundColor: MaterialStateProperty.all(Colors.blue)),
+                onPressed: _listen,
+                child: Icon(
+                  _isListening ? Icons.mic : Icons.mic_none,
+                  size: 40,
+                  color: Colors.white,
+                ),
+              ),
             ),
           ),
-        ),
-        Text(
-          _isListening ? "Listening..." : "Tap to Talk",
-          style: TextStyle(
-              fontStyle: FontStyle.italic,
-              fontSize: 18,
-              color: Colors.blue[600]),
-        )
-      ]),
+          Text(
+            _isListening ? "Listening..." : "Tap to Talk",
+            style: TextStyle(
+                fontStyle: FontStyle.italic,
+                fontSize: 18,
+                color: Colors.blue[600]),
+          )
+        ]),
+      ),
     );
   }
 
@@ -500,24 +511,24 @@ class _ChatPageState extends State<ChatPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: Builder(
-          builder: (BuildContext context) {
-            return IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: () {
-                Scaffold.of(context).openDrawer();
-              },
-              tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
-            );
-          },
-        ),
-        title: const Text("Chat",
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            )),
-      ),
+          leading: Builder(
+            builder: (BuildContext context) {
+              return IconButton(
+                icon: const Icon(Icons.settings),
+                onPressed: () {
+                  Scaffold.of(context).openDrawer();
+                },
+                tooltip: MaterialLocalizations.of(context).openAppDrawerTooltip,
+              );
+            },
+          ),
+          centerTitle: true,
+          title: const Text("Chat",
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ))),
       drawer: _buildDrawer(),
       body: SafeArea(
         child: Column(children: [
