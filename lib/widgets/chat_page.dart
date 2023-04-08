@@ -35,9 +35,9 @@ class _ChatPageState extends State<ChatPage> {
   late bool isVietnamese;
 
   bool isAutoTTS = true;
+  int indexSpeaking = -1;
 
   bool isButtonDisabled = ChatGPTUltils.isProcessing;
-  bool isSpeaking = false;
 
   final stt.SpeechToText _speech = stt.SpeechToText();
   bool _isListening = false;
@@ -70,7 +70,8 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  Future _speak(String text) async {
+  Future _speak(String text, int idx) async {
+    indexSpeaking = idx;
     if (languages == TtsLanguage.vn) {
       await flutterTts.setLanguage("vi-VN");
     } else {
@@ -79,19 +80,24 @@ class _ChatPageState extends State<ChatPage> {
     flutterTts.setPitch(1.0);
     flutterTts.setVolume(1.0);
     await flutterTts.speak(text);
-    var isDoneSpeaking = await flutterTts.awaitSpeakCompletion(true);
-    if (isDoneSpeaking == 1) {
-      setState(() {
-        isSpeaking = false;
-      });
-    }
+    await flutterTts.awaitSpeakCompletion(true);
+    print("THE SPEAK IS DONE AT IDX: $idx");
+    setState(() {
+      // if (indexSpeaking == -1) return;
+      print('indexSpeaking COMPLETION INDEX: $indexSpeaking');
+      print("idx to false in _speak: $idx");
+      messageList[idx].state = false;
+      // print("THE STATE: ${messageList[indexSpeaking].state}");
+      indexSpeaking = -1;
+    });
   }
 
-  _stop() async {
-    setState(() {
-      isSpeaking = false;
-    });
+  _stop(int idx) async {
     await flutterTts.stop();
+    setState(() {
+      print("idx to false in _stop: $idx");
+      // messageList[idx].state = false;
+    });
   }
 
   void _listen() async {
@@ -114,6 +120,7 @@ class _ChatPageState extends State<ChatPage> {
     } else {
       var message = textFieldController.text;
       textFieldController.clear();
+      await Future.delayed(const Duration(milliseconds: 100));
       _speech.stop();
       DB_Ultils.insertMessage(
           Message(message: message, date: DateTime.now(), isUser: true));
@@ -329,6 +336,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ),
         indexedItemBuilder: (context, message, index) {
+          print('indexSpeaking in indexedItemBuilder: $indexSpeaking');
           return message.isUser
               ? Bubble(
                   elevation: 5,
@@ -366,31 +374,14 @@ class _ChatPageState extends State<ChatPage> {
                         setState(() {
                           message.state = !message.state;
                           if (message.state) {
-                            _speak(message.message);
+                            if (indexSpeaking != -1) {
+                              _stop(indexSpeaking);
+                            }
+                            _speak(message.message, index);
                           } else {
-                            _stop();
+                            _stop(index);
                           }
-                          // if (isPlaying) {
-                          //   isPlaying = false;
-                          //   _stop();
-                          // } else {
-                          //   if (isSpeaking) {
-                          //     _stop();
-                          //     isPlaying = true;
-                          //     isSpeaking = true;
-                          //     _speak(message);
-                          //   } else {
-                          //     isPlaying = true;
-                          //     isSpeaking = true;
-                          //     _speak(message);
-                          //   }
-                          // }
                         });
-                        // if (message.state) {
-                        //   _speak(message.message);
-                        // } else {
-                        //   _stop();
-                        // }
                       },
                       icon: message.state
                           ? LoadingAnimationWidget.beat(
@@ -409,14 +400,17 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _sendRequest(String message) async {
     String result = await chatGPTUltils.getResponse(message);
+    if (isAutoTTS) {
+      _speak(result, messageList.length);
+    }
     setState(() {
-      messageList
-          .add(Message(message: result, date: DateTime.now(), isUser: false));
+      messageList.add(Message(
+          message: result,
+          date: DateTime.now(),
+          isUser: false,
+          state: isAutoTTS ? true : false));
       isButtonDisabled = false;
     });
-    if (isAutoTTS) {
-      _speak(result);
-    }
     DB_Ultils.insertMessage(
         Message(message: result, date: DateTime.now(), isUser: false));
   }
@@ -430,6 +424,7 @@ class _ChatPageState extends State<ChatPage> {
           primaryColorDark: Colors.blue,
         ),
         child: TextField(
+          cursorColor: Colors.blue,
           keyboardType: TextInputType.multiline,
           maxLines: null,
           decoration: InputDecoration(
