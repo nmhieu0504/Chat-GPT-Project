@@ -54,6 +54,7 @@ class _ChatPageState extends State<ChatPage> {
       isVietnamese = prefs.getBool('isVietnamese') ?? false;
     });
     languages = isEnglish ? TtsLanguage.en : TtsLanguage.vn;
+    flutterTts.setLanguage(isEnglish ? "en-US" : "vi-VN");
   }
 
   Future<void> _loadMessage() async {
@@ -166,6 +167,7 @@ class _ChatPageState extends State<ChatPage> {
                               isEnglish = true;
                               isVietnamese = false;
                             });
+                            flutterTts.setLanguage("en-US");
                             // obtain shared preferences
                             final prefs = await SharedPreferences.getInstance();
                             // set value
@@ -197,7 +199,7 @@ class _ChatPageState extends State<ChatPage> {
                               isEnglish = false;
                               isVietnamese = true;
                             });
-
+                            flutterTts.setLanguage("vi-VN");
                             // obtain shared preferences
                             final prefs = await SharedPreferences.getInstance();
                             // set value
@@ -290,8 +292,8 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildMessageListView() {
     return Expanded(
       child: GroupedListView<Message, DateTime>(
-        // order: GroupedListOrder.DESC,
-        // reverse: true,
+        order: GroupedListOrder.DESC,
+        reverse: true,
         addAutomaticKeepAlives: true,
         padding: const EdgeInsets.all(10),
         elements: messageList,
@@ -344,14 +346,12 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   IconButton(
                       onPressed: () {
-                        setState(() {
+                        setState(() async {
                           message.state = !message.state;
                           if (message.state) {
                             flutterTts.speak(message.message);
                             flutterTts.setCompletionHandler(() {
-                              setState(() {
-                                message.state = false;
-                              });
+                              message.state = false;
                             });
                           } else {
                             flutterTts.stop();
@@ -376,15 +376,21 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _sendRequest(String message) async {
     textFieldController.clear();
     String result = await chatGPTUltils.getResponse(message);
+    int idx = messageList.length;
     if (isAutoTTS) {
       flutterTts.speak(result);
+      flutterTts.setCompletionHandler(() {
+        setState(() {
+          messageList[idx].state = false;
+        });
+      });
     }
     setState(() {
       messageList.add(Message(
           message: result,
           date: DateTime.now(),
           isUser: false,
-          state: isAutoTTS ? true : false));
+          state: isAutoTTS));
       isButtonDisabled = false;
     });
     DB_Ultils.insertMessage(
@@ -508,5 +514,10 @@ class _ChatPageState extends State<ChatPage> {
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 }
