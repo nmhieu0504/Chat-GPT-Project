@@ -20,8 +20,6 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-enum TtsState { playing, stopped }
-
 enum TtsLanguage { en, vn }
 
 class _ChatPageState extends State<ChatPage> {
@@ -35,7 +33,6 @@ class _ChatPageState extends State<ChatPage> {
   late bool isVietnamese;
 
   bool isAutoTTS = true;
-  int indexSpeaking = -1;
 
   bool isButtonDisabled = ChatGPTUltils.isProcessing;
 
@@ -70,35 +67,21 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  Future _speak(String text, int idx) async {
-    indexSpeaking = idx;
-    if (languages == TtsLanguage.vn) {
-      await flutterTts.setLanguage("vi-VN");
-    } else {
-      await flutterTts.setLanguage("en-US");
-    }
-    flutterTts.setPitch(1.0);
-    flutterTts.setVolume(1.0);
-    await flutterTts.speak(text);
-    await flutterTts.awaitSpeakCompletion(true);
-    print("THE SPEAK IS DONE AT IDX: $idx");
-    setState(() {
-      // if (indexSpeaking == -1) return;
-      print('indexSpeaking COMPLETION INDEX: $indexSpeaking');
-      print("idx to false in _speak: $idx");
-      messageList[idx].state = false;
-      // print("THE STATE: ${messageList[indexSpeaking].state}");
-      indexSpeaking = -1;
-    });
-  }
+  // Future _speak(String text) async {
+  //   if (languages == TtsLanguage.vn) {
+  //     await flutterTts.setLanguage("vi-VN");
+  //   } else {
+  //     await flutterTts.setLanguage("en-US");
+  //   }
+  //   flutterTts.setPitch(1.0);
+  //   flutterTts.setVolume(1.0);
+  //   await flutterTts.speak(text);
+  //   await flutterTts.awaitSpeakCompletion(true);
+  // }
 
-  _stop(int idx) async {
-    await flutterTts.stop();
-    setState(() {
-      print("idx to false in _stop: $idx");
-      // messageList[idx].state = false;
-    });
-  }
+  // Future _stop() async {
+  //   await flutterTts.stop();
+  // }
 
   void _listen() async {
     if (!_isListening) {
@@ -118,19 +101,8 @@ class _ChatPageState extends State<ChatPage> {
         );
       }
     } else {
-      var message = textFieldController.text;
-      textFieldController.clear();
-      await Future.delayed(const Duration(milliseconds: 100));
-      _speech.stop();
-      DB_Ultils.insertMessage(
-          Message(message: message, date: DateTime.now(), isUser: true));
-      setState(() {
-        _isListening = false;
-        isButtonDisabled = true;
-        messageList
-            .add(Message(message: message, date: DateTime.now(), isUser: true));
-      });
-      _sendRequest(message);
+      await _speech.stop();
+      setState(() => _isListening = false);
     }
   }
 
@@ -251,7 +223,8 @@ class _ChatPageState extends State<ChatPage> {
                         onPressed: () {
                           Navigator.pop(context);
                         },
-                        child: const Text('Close'),
+                        child: const Text('Close',
+                            style: TextStyle(color: Colors.blue)),
                       ),
                     ],
                   ),
@@ -277,7 +250,7 @@ class _ChatPageState extends State<ChatPage> {
                                 textStyle:
                                     Theme.of(context).textTheme.labelLarge,
                               ),
-                              child: const Text('Yes',
+                              child: const Text('Ok',
                                   style: TextStyle(color: Colors.red)),
                               onPressed: () {
                                 setState(() {
@@ -293,7 +266,8 @@ class _ChatPageState extends State<ChatPage> {
                                 textStyle:
                                     Theme.of(context).textTheme.labelLarge,
                               ),
-                              child: const Text('No'),
+                              child: const Text('Cancel',
+                                  style: TextStyle(color: Colors.blue)),
                               onPressed: () {
                                 Navigator.of(context).pop();
                               },
@@ -336,7 +310,6 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ),
         indexedItemBuilder: (context, message, index) {
-          print('indexSpeaking in indexedItemBuilder: $indexSpeaking');
           return message.isUser
               ? Bubble(
                   elevation: 5,
@@ -374,12 +347,14 @@ class _ChatPageState extends State<ChatPage> {
                         setState(() {
                           message.state = !message.state;
                           if (message.state) {
-                            if (indexSpeaking != -1) {
-                              _stop(indexSpeaking);
-                            }
-                            _speak(message.message, index);
+                            flutterTts.speak(message.message);
+                            flutterTts.setCompletionHandler(() {
+                              setState(() {
+                                message.state = false;
+                              });
+                            });
                           } else {
-                            _stop(index);
+                            flutterTts.stop();
                           }
                         });
                       },
@@ -399,9 +374,10 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _sendRequest(String message) async {
+    textFieldController.clear();
     String result = await chatGPTUltils.getResponse(message);
     if (isAutoTTS) {
-      _speak(result, messageList.length);
+      flutterTts.speak(result);
     }
     setState(() {
       messageList.add(Message(
@@ -445,7 +421,6 @@ class _ChatPageState extends State<ChatPage> {
                     ),
               onPressed: () {
                 String text = textFieldController.text;
-                textFieldController.clear();
                 setState(() {
                   isButtonDisabled = true;
                   messageList.add(Message(
