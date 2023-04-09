@@ -68,22 +68,6 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {});
   }
 
-  // Future _speak(String text) async {
-  //   if (languages == TtsLanguage.vn) {
-  //     await flutterTts.setLanguage("vi-VN");
-  //   } else {
-  //     await flutterTts.setLanguage("en-US");
-  //   }
-  //   flutterTts.setPitch(1.0);
-  //   flutterTts.setVolume(1.0);
-  //   await flutterTts.speak(text);
-  //   await flutterTts.awaitSpeakCompletion(true);
-  // }
-
-  // Future _stop() async {
-  //   await flutterTts.stop();
-  // }
-
   void _listen() async {
     if (!_isListening) {
       bool available = await _speech.initialize(
@@ -292,8 +276,8 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildMessageListView() {
     return Expanded(
       child: GroupedListView<Message, DateTime>(
-        order: GroupedListOrder.DESC,
-        reverse: true,
+        // order: GroupedListOrder.DESC,
+        // reverse: true,
         addAutomaticKeepAlives: true,
         padding: const EdgeInsets.all(10),
         elements: messageList,
@@ -346,12 +330,19 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   IconButton(
                       onPressed: () {
-                        setState(() async {
+                        setState(() {
                           message.state = !message.state;
                           if (message.state) {
+                            for (var i = 0; i < messageList.length; i++) {
+                              if (i != index) {
+                                messageList[i].state = false;
+                              }
+                            }
                             flutterTts.speak(message.message);
                             flutterTts.setCompletionHandler(() {
-                              message.state = false;
+                              setState(() {
+                                message.state = false;
+                              });
                             });
                           } else {
                             flutterTts.stop();
