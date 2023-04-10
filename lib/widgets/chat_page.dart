@@ -373,6 +373,9 @@ class _ChatPageState extends State<ChatPage> {
     String result = await chatGPTUltils.getResponse(message);
     int idx = messageList.length;
     if (isAutoTTS) {
+      for (var i = 0; i < messageList.length; i++) {
+        messageList[i].state = false;
+      }
       flutterTts.speak(result);
       flutterTts.setCompletionHandler(() {
         setState(() {
