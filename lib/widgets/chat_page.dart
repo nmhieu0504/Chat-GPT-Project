@@ -236,8 +236,11 @@ class _ChatPageState extends State<ChatPage> {
                                 textStyle:
                                     Theme.of(context).textTheme.labelLarge,
                               ),
-                              child: const Text('Ok',
-                                  style: TextStyle(color: Colors.red)),
+                              child: const Text(
+                                'Ok',
+                                style:
+                                    TextStyle(color: Colors.red, fontSize: 16),
+                              ),
                               onPressed: () {
                                 setState(() {
                                   messageList.clear();
@@ -253,7 +256,8 @@ class _ChatPageState extends State<ChatPage> {
                                     Theme.of(context).textTheme.labelLarge,
                               ),
                               child: const Text('Cancel',
-                                  style: TextStyle(color: Colors.blue)),
+                                  style: TextStyle(
+                                      color: Colors.blue, fontSize: 16)),
                               onPressed: () {
                                 Navigator.of(context).pop();
                               },
