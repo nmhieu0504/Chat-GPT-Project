@@ -424,6 +424,7 @@ class _ChatPageState extends State<ChatPage> {
                       size: 20,
                     ),
               onPressed: () {
+                if (isButtonDisabled) return;
                 String text = textFieldController.text;
                 setState(() {
                   isButtonDisabled = true;
