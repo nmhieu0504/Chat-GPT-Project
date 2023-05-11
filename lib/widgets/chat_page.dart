@@ -291,7 +291,7 @@ class _ChatPageState extends State<ChatPage> {
           message.date.day,
         ),
         groupHeaderBuilder: (Message message) => Container(
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: 10, top: 10),
           child: Align(
             alignment: Alignment.topCenter,
             child: Text(DateFormat.yMMMMEEEEd().format(message.date),
