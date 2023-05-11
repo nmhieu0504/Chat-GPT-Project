@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>   
     <application
-        android:label="Chat GPT - Open AI Chat Bot"
+        android:label="Chat Bot AI"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
