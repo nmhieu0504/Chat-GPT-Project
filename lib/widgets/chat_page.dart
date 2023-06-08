@@ -65,6 +65,8 @@ class _ChatPageState extends State<ChatPage> {
         "content": element.message
       });
     }
+    ChatGPTUltils.totalTokens =
+        (await SharedPreferences.getInstance()).getInt("totalTokens") ?? 0;
     setState(() {});
   }
 
@@ -245,6 +247,10 @@ class _ChatPageState extends State<ChatPage> {
                                 setState(() {
                                   messageList.clear();
                                   ChatGPTUltils.history.clear();
+                                  ChatGPTUltils.totalTokens = 0;
+                                  SharedPreferences.getInstance().then((prefs) {
+                                    prefs.setInt("totalTokens", 0);
+                                  });
                                 });
                                 DB_Ultils.deleteAll();
                                 Navigator.of(context).pop();
@@ -291,7 +297,7 @@ class _ChatPageState extends State<ChatPage> {
           message.date.day,
         ),
         groupHeaderBuilder: (Message message) => Container(
-          margin: const EdgeInsets.only(bottom: 10, top: 10),
+          margin: const EdgeInsets.only(bottom: 20, top: 10),
           child: Align(
             alignment: Alignment.topCenter,
             child: Text(DateFormat.yMMMMEEEEd().format(message.date),
@@ -305,7 +311,7 @@ class _ChatPageState extends State<ChatPage> {
                   elevation: 5,
                   margin: const BubbleEdges.only(
                     top: 5,
-                    bottom: 5,
+                    bottom: 10,
                   ),
                   alignment: Alignment.topRight,
                   nip: BubbleNip.rightTop,
@@ -322,7 +328,7 @@ class _ChatPageState extends State<ChatPage> {
                         elevation: 5,
                         margin: const BubbleEdges.only(
                           top: 5,
-                          bottom: 5,
+                          bottom: 10,
                         ),
                         alignment: Alignment.topLeft,
                         nip: BubbleNip.leftTop,
